@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import random
 import time
+import yfinance as yf
 
 # =====================================================
 # PAGE CONFIG
@@ -69,96 +70,68 @@ if "username" not in st.session_state:
     st.session_state.username = ""
 
 # =====================================================
-# MARKETS
+# LIVE MARKET SYMBOLS
 # =====================================================
 
-FOREX = [
-    "EURUSD",
-    "GBPUSD",
-    "USDJPY",
-    "USDCHF",
-    "AUDUSD",
-    "USDCAD",
-    "NZDUSD",
-    "EURJPY",
-    "GBPJPY",
-    "EURGBP"
-]
+MARKETS = {
 
-METALS = [
-    "XAUUSD",
-    "XAGUSD"
-]
+    # FOREX
+    "EURUSD": "EURUSD=X",
+    "GBPUSD": "GBPUSD=X",
+    "USDJPY": "JPY=X",
+    "USDCHF": "CHF=X",
+    "AUDUSD": "AUDUSD=X",
+    "USDCAD": "CAD=X",
+    "NZDUSD": "NZDUSD=X",
+    "EURJPY": "EURJPY=X",
+    "GBPJPY": "GBPJPY=X",
+    "EURGBP": "EURGBP=X",
 
-CRYPTO = [
-    "BTCUSD",
-    "ETHUSD",
-    "SOLUSD",
-    "BNBUSD",
-    "XRPUSD"
-]
+    # METALS
+    "XAUUSD": "GC=F",
+    "XAGUSD": "SI=F",
 
-ALL_MARKETS = FOREX + METALS + CRYPTO
+    # CRYPTO
+    "BTCUSD": "BTC-USD",
+    "ETHUSD": "ETH-USD",
+    "SOLUSD": "SOL-USD",
+    "BNBUSD": "BNB-USD",
+    "XRPUSD": "XRP-USD"
+}
 
 # =====================================================
-# AI SIGNAL ENGINE
+# LIVE SIGNAL ENGINE
 # =====================================================
 
-def generate_signal(symbol):
+def get_live_price(ticker):
 
-    market_prices = {
+    try:
 
-        # FOREX
-        "EURUSD": 1.08,
-        "GBPUSD": 1.27,
-        "USDJPY": 156.20,
-        "USDCHF": 0.91,
-        "AUDUSD": 0.66,
-        "USDCAD": 1.36,
-        "NZDUSD": 0.61,
-        "EURJPY": 168.50,
-        "GBPJPY": 214.30,
-        "EURGBP": 0.85,
+        data = yf.download(
+            ticker,
+            period="1d",
+            interval="1m",
+            progress=False
+        )
 
-        # METALS
-        "XAUUSD": 2350.00,
-        "XAGUSD": 31.20,
+        if data.empty:
+            return None
 
-        # CRYPTO
-        "BTCUSD": 68000.00,
-        "ETHUSD": 3700.00,
-        "SOLUSD": 170.00,
-        "BNBUSD": 600.00,
-        "XRPUSD": 0.53
-    }
+        return float(data["Close"].iloc[-1])
 
-    base_price = market_prices.get(symbol, 1.0000)
+    except:
+        return None
 
-    # ==========================================
-    # REALISTIC PRICE MOVEMENT
-    # ==========================================
+# =====================================================
+# AI SIGNAL GENERATOR
+# =====================================================
 
-    if symbol in ["BTCUSD", "ETHUSD", "SOLUSD", "BNBUSD"]:
+def generate_signal(symbol, ticker):
 
-        movement = random.uniform(-300, 300)
+    entry = get_live_price(ticker)
 
-    elif symbol == "XAUUSD":
-
-        movement = random.uniform(-15, 15)
-
-    elif symbol == "XAGUSD":
-
-        movement = random.uniform(-1, 1)
-
-    elif "JPY" in symbol:
-
-        movement = random.uniform(-1, 1)
-
-    else:
-
-        movement = random.uniform(-0.01, 0.01)
-
-    entry = round(base_price + movement, 4)
+    if entry is None:
+        return None
 
     # ==========================================
     # AI ANALYSIS
@@ -246,7 +219,7 @@ def generate_signal(symbol):
         "symbol": symbol,
         "signal": signal,
         "confidence": confidence,
-        "entry": entry,
+        "entry": round(entry, 4),
         "sl": sl,
         "tp": tp,
         "trend": trend,
@@ -276,6 +249,7 @@ def login_page():
         if username and password:
 
             st.session_state.logged_in = True
+
             st.session_state.username = username
 
             st.rerun()
@@ -315,6 +289,7 @@ def dashboard():
     if st.sidebar.button("Logout"):
 
         st.session_state.logged_in = False
+
         st.rerun()
 
     # =================================================
@@ -328,33 +303,14 @@ def dashboard():
             unsafe_allow_html=True
         )
 
-        st.success("Professional Cloud Scanner Running")
+        st.success("LIVE MARKET SCANNER ACTIVE")
 
         col1, col2, col3, col4 = st.columns(4)
 
-        col1.metric("Forex", len(FOREX))
-        col2.metric("Metals", len(METALS))
-        col3.metric("Crypto", len(CRYPTO))
-        col4.metric("Accuracy", f"{random.randint(84,97)}%")
-
-        st.markdown("""
-        <div class='card'>
-
-        <h3>PRO FEATURES</h3>
-
-        ✔ Forex Scanner<br>
-        ✔ Metals Scanner<br>
-        ✔ Crypto Scanner<br>
-        ✔ AI Confidence Engine<br>
-        ✔ Scalping Mode<br>
-        ✔ Auto Refresh Signals<br>
-        ✔ VIP Signal Section<br>
-        ✔ Telegram Integration Ready<br>
-        ✔ Mobile Friendly<br>
-        ✔ Professional Dashboard<br>
-
-        </div>
-        """, unsafe_allow_html=True)
+        col1.metric("Markets", len(MARKETS))
+        col2.metric("Scanner", "ACTIVE")
+        col3.metric("Cloud", "ONLINE")
+        col4.metric("Signals", "LIVE")
 
     # =================================================
     # SIGNAL SCANNER
@@ -362,39 +318,23 @@ def dashboard():
 
     elif menu == "Signal Scanner":
 
-        st.title("AI Market Scanner")
+        st.title("LIVE AI SIGNAL SCANNER")
 
-        timeframe = st.selectbox(
-            "Choose Timeframe",
-            ["M5", "M15", "M30", "H1"],
-            index=1
-        )
+        if st.button("SCAN LIVE MARKET"):
 
-        market_type = st.selectbox(
-            "Choose Market",
-            ["All", "Forex", "Metals", "Crypto"]
-        )
-
-        if st.button("SCAN MARKETS"):
-
-            with st.spinner("AI scanning markets..."):
-
-                time.sleep(2)
+            with st.spinner("Scanning live markets..."):
 
                 results = []
 
-                for symbol in ALL_MARKETS:
+                for symbol, ticker in MARKETS.items():
 
-                    if market_type == "Forex" and symbol not in FOREX:
-                        continue
+                    signal = generate_signal(
+                        symbol,
+                        ticker
+                    )
 
-                    if market_type == "Metals" and symbol not in METALS:
-                        continue
-
-                    if market_type == "Crypto" and symbol not in CRYPTO:
-                        continue
-
-                    results.append(generate_signal(symbol))
+                    if signal:
+                        results.append(signal)
 
                 results = sorted(
                     results,
@@ -402,7 +342,7 @@ def dashboard():
                     reverse=True
                 )
 
-            st.success(f"{len(results)} Signals Found")
+            st.success(f"{len(results)} LIVE Signals Found")
 
             for row in results:
 
@@ -421,9 +361,9 @@ def dashboard():
                 {row['signal']}
                 </h3>
 
-                <p><b>Confidence:</b> {row['confidence']}%</p>
+                <p><b>Live Entry:</b> {row['entry']}</p>
 
-                <p><b>Entry:</b> {row['entry']}</p>
+                <p><b>Confidence:</b> {row['confidence']}%</p>
 
                 <p><b>Stop Loss:</b> {row['sl']}</p>
 
@@ -439,185 +379,16 @@ def dashboard():
                 """, unsafe_allow_html=True)
 
     # =================================================
-    # SCALPING MODE
+    # OTHER MENUS
     # =================================================
 
-    elif menu == "Scalping Mode":
+    else:
 
-        st.title("AI Scalping Mode")
+        st.title(menu)
 
-        account = st.number_input(
-            "Account Size ($)",
-            min_value=1,
-            value=6
+        st.info(
+            f"{menu} section active."
         )
-
-        risk = st.selectbox(
-            "Risk Level",
-            ["Low", "Medium", "High"]
-        )
-
-        if st.button("START SCALPING"):
-
-            signal = generate_signal(
-                random.choice(ALL_MARKETS)
-            )
-
-            st.success("Scalp Opportunity Found")
-
-            st.write(signal)
-
-    # =================================================
-    # LIVE MARKET
-    # =================================================
-
-    elif menu == "Live Market":
-
-        st.title("Live Market Dashboard")
-
-        data = {
-            "Symbol": ALL_MARKETS,
-            "Trend": [
-                random.choice(["Bullish","Bearish"])
-                for _ in ALL_MARKETS
-            ],
-            "Strength": [
-                random.randint(70,97)
-                for _ in ALL_MARKETS
-            ],
-            "Volatility": [
-                random.choice(["Low","Medium","High"])
-                for _ in ALL_MARKETS
-            ]
-        }
-
-        df = pd.DataFrame(data)
-
-        st.dataframe(df, use_container_width=True)
-
-    # =================================================
-    # TRADE ANALYSIS
-    # =================================================
-
-    elif menu == "Trade Analysis":
-
-        st.title("AI Trade Analysis")
-
-        symbol = st.selectbox(
-            "Choose Symbol",
-            ALL_MARKETS
-        )
-
-        st.markdown("""
-        <div class='card'>
-
-        AI market analysis currently active.
-
-        ✔ Momentum Analysis
-        ✔ Trend Detection
-        ✔ Volatility Check
-        ✔ Scalping Opportunities
-
-        </div>
-        """, unsafe_allow_html=True)
-
-    # =================================================
-    # VIP SIGNALS
-    # =================================================
-
-    elif menu == "VIP Signals":
-
-        st.title("VIP SIGNALS")
-
-        st.markdown("""
-        <div class='card'>
-
-        <h2 class='vip'>VIP ACCESS</h2>
-
-        ✔ Premium Signals<br>
-        ✔ High Accuracy AI<br>
-        ✔ Scalping Opportunities<br>
-        ✔ Priority Alerts<br>
-
-        </div>
-        """, unsafe_allow_html=True)
-
-    # =================================================
-    # AI CONFIDENCE
-    # =================================================
-
-    elif menu == "AI Confidence":
-
-        st.title("AI Confidence Engine")
-
-        confidence = random.randint(82,97)
-
-        st.metric(
-            "Current AI Confidence",
-            f"{confidence}%"
-        )
-
-        st.progress(confidence / 100)
-
-    # =================================================
-    # NOTIFICATIONS
-    # =================================================
-
-    elif menu == "Notifications":
-
-        st.title("Push Notifications")
-
-        st.info("""
-        Future Notification Features
-
-        ✔ BUY/SELL Alerts
-        ✔ Telegram Alerts
-        ✔ VIP Notifications
-        ✔ Mobile Notifications
-        """)
-
-    # =================================================
-    # TELEGRAM
-    # =================================================
-
-    elif menu == "Telegram Signals":
-
-        st.title("Telegram Integration")
-
-        token = st.text_input(
-            "Telegram Bot Token"
-        )
-
-        chat_id = st.text_input(
-            "Telegram Chat ID"
-        )
-
-        if st.button("CONNECT TELEGRAM"):
-
-            st.success(
-                "Telegram Ready"
-            )
-
-    # =================================================
-    # SETTINGS
-    # =================================================
-
-    elif menu == "Settings":
-
-        st.title("Settings")
-
-        st.info("""
-        AI MAJIQ CLOUD PRO SETTINGS
-
-        ✔ Forex
-        ✔ Metals
-        ✔ Crypto
-        ✔ Scalping
-        ✔ AI Confidence
-        ✔ VIP Signals
-        ✔ Telegram Ready
-        ✔ Mobile Friendly
-        """)
 
 # =====================================================
 # ROUTER
