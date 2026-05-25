@@ -1,11 +1,18 @@
 import streamlit as st
-import yfinance as yf
+import requests
+import pandas as pd
 from datetime import datetime
 import time
 
-# ======================================================
+# =====================================================
+# API KEY
+# =====================================================
+
+API_KEY = "97e8ab17948f4772a17cb7dd4f8a6471"
+
+# =====================================================
 # PAGE CONFIG
-# ======================================================
+# =====================================================
 
 st.set_page_config(
     page_title="AI MAJIQ CLOUD PRO",
@@ -13,30 +20,30 @@ st.set_page_config(
     layout="wide"
 )
 
-# ======================================================
+# =====================================================
 # CSS
-# ======================================================
+# =====================================================
 
 st.markdown("""
 <style>
 
 .stApp{
-    background:#020617;
+    background: linear-gradient(135deg,#020617,#07111f,#020617);
     color:white;
 }
 
 .title{
     font-size:55px;
     font-weight:bold;
-    color:#6effb2;
+    color:#72ffb6;
 }
 
 .card{
-    background:#0f172a;
-    padding:20px;
+    background:rgba(255,255,255,0.05);
     border-radius:20px;
+    padding:20px;
     margin-bottom:20px;
-    border:1px solid #1e293b;
+    border:1px solid rgba(255,255,255,0.08);
 }
 
 .buy{
@@ -60,19 +67,21 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# ======================================================
+# =====================================================
 # LOGIN
-# ======================================================
+# =====================================================
 
-if "logged" not in st.session_state:
-    st.session_state.logged = False
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
 
-def login():
+def login_page():
 
     st.markdown(
         '<p class="title">AI MAJIQ CLOUD PRO</p>',
         unsafe_allow_html=True
     )
+
+    st.subheader("Professional AI Trading Scanner")
 
     user = st.text_input("Username")
 
@@ -85,150 +94,202 @@ def login():
 
         if user and password:
 
-            st.session_state.logged = True
+            st.session_state.logged_in = True
+
             st.rerun()
 
         else:
 
             st.error("Enter username and password")
 
-# ======================================================
+# =====================================================
 # MARKETS
-# ======================================================
+# =====================================================
 
 markets = {
 
-    # FOREX
-    "EURUSD": "EURUSD=X",
-    "GBPUSD": "GBPUSD=X",
-    "AUDUSD": "AUDUSD=X",
-    "USDJPY": "JPY=X",
-
-    # METALS
-    "XAUUSD": "GC=F",
-    "XAGUSD": "SI=F",
-
-    # CRYPTO
-    "BTCUSD": "BTC-USD",
-    "ETHUSD": "ETH-USD"
+    "EUR/USD": "EUR/USD",
+    "GBP/USD": "GBP/USD",
+    "USD/JPY": "USD/JPY",
+    "AUD/USD": "AUD/USD",
+    "XAU/USD": "XAU/USD",
+    "BTC/USD": "BTC/USD",
+    "ETH/USD": "ETH/USD"
 }
 
-# ======================================================
-# SIGNAL FUNCTION
-# ======================================================
+# =====================================================
+# RSI
+# =====================================================
 
-def scan_market(symbol, timeframe):
+def calculate_rsi(close, period=14):
+
+    delta = close.diff()
+
+    gain = delta.clip(lower=0)
+
+    loss = -1 * delta.clip(upper=0)
+
+    avg_gain = gain.rolling(period).mean()
+
+    avg_loss = loss.rolling(period).mean()
+
+    rs = avg_gain / avg_loss
+
+    rsi = 100 - (100 / (1 + rs))
+
+    return rsi
+
+# =====================================================
+# MACD
+# =====================================================
+
+def calculate_macd(close):
+
+    ema12 = close.ewm(span=12).mean()
+
+    ema26 = close.ewm(span=26).mean()
+
+    macd = ema12 - ema26
+
+    signal = macd.ewm(span=9).mean()
+
+    return macd, signal
+
+# =====================================================
+# FETCH DATA
+# =====================================================
+
+def get_market_data(symbol, interval):
 
     try:
 
-        # ==========================================
-        # PERIOD FIX
-        # ==========================================
-
-        if timeframe == "5m":
-            period = "1d"
-
-        elif timeframe == "15m":
-            period = "1d"
-
-        elif timeframe == "30m":
-            period = "5d"
-
-        elif timeframe == "60m":
-            period = "7d"
-
-        else:
-            period = "1mo"
-
-        # ==========================================
-        # DOWNLOAD
-        # ==========================================
-
-        data = yf.download(
-            symbol,
-            period=period,
-            interval=timeframe,
-            progress=False
+        url = (
+            f"https://api.twelvedata.com/time_series?"
+            f"symbol={symbol}"
+            f"&interval={interval}"
+            f"&outputsize=100"
+            f"&apikey={API_KEY}"
         )
 
-        # ==========================================
-        # CHECK DATA
-        # ==========================================
+        response = requests.get(url)
 
-        if data.empty:
+        data = response.json()
+
+        if "values" not in data:
             return None
 
-        # ==========================================
-        # CLOSE PRICE
-        # ==========================================
+        df = pd.DataFrame(data["values"])
 
-        close = float(data["Close"].iloc[-1])
+        df = df.iloc[::-1]
 
-        # ==========================================
-        # EMA
-        # ==========================================
+        df["close"] = df["close"].astype(float)
 
-        ema20 = float(
-            data["Close"].ewm(span=20).mean().iloc[-1]
-        )
-
-        ema50 = float(
-            data["Close"].ewm(span=50).mean().iloc[-1]
-        )
-
-        # ==========================================
-        # SIGNAL
-        # ==========================================
-
-        signal = "NEUTRAL"
-
-        if ema20 > ema50:
-            signal = "BUY"
-
-        elif ema20 < ema50:
-            signal = "SELL"
-
-        # ==========================================
-        # TP / SL
-        # ==========================================
-
-        if signal == "BUY":
-
-            tp = round(close * 1.01, 4)
-
-            sl = round(close * 0.995, 4)
-
-        elif signal == "SELL":
-
-            tp = round(close * 0.99, 4)
-
-            sl = round(close * 1.005, 4)
-
-        else:
-
-            tp = close
-            sl = close
-
-        # ==========================================
-        # RETURN
-        # ==========================================
-
-        return {
-
-            "price": round(close, 4),
-            "signal": signal,
-            "tp": tp,
-            "sl": sl,
-            "ema20": round(ema20, 4),
-            "ema50": round(ema50, 4)
-        }
+        return df
 
     except:
         return None
 
-# ======================================================
+# =====================================================
+# SIGNAL ENGINE
+# =====================================================
+
+def scan_market(symbol, interval):
+
+    df = get_market_data(symbol, interval)
+
+    if df is None:
+        return None
+
+    close = df["close"]
+
+    current_price = close.iloc[-1]
+
+    # EMA
+
+    ema20 = close.ewm(span=20).mean().iloc[-1]
+
+    ema50 = close.ewm(span=50).mean().iloc[-1]
+
+    # RSI
+
+    rsi = calculate_rsi(close).iloc[-1]
+
+    # MACD
+
+    macd, macd_signal = calculate_macd(close)
+
+    macd_value = macd.iloc[-1]
+
+    macd_signal_value = macd_signal.iloc[-1]
+
+    # SCORE
+
+    score = 0
+
+    if ema20 > ema50:
+        score += 1
+    else:
+        score -= 1
+
+    if rsi > 55:
+        score += 1
+
+    elif rsi < 45:
+        score -= 1
+
+    if macd_value > macd_signal_value:
+        score += 1
+    else:
+        score -= 1
+
+    # SIGNAL
+
+    if score >= 2:
+        signal = "BUY"
+
+    elif score <= -2:
+        signal = "SELL"
+
+    else:
+        signal = "NEUTRAL"
+
+    confidence = abs(score) * 33
+
+    # TP / SL
+
+    if signal == "BUY":
+
+        tp = round(current_price * 1.01, 4)
+
+        sl = round(current_price * 0.995, 4)
+
+    elif signal == "SELL":
+
+        tp = round(current_price * 0.99, 4)
+
+        sl = round(current_price * 1.005, 4)
+
+    else:
+
+        tp = current_price
+        sl = current_price
+
+    return {
+
+        "price": round(current_price, 4),
+        "signal": signal,
+        "confidence": confidence,
+        "ema20": round(ema20, 4),
+        "ema50": round(ema50, 4),
+        "rsi": round(rsi, 2),
+        "macd": round(macd_value, 4),
+        "tp": tp,
+        "sl": sl
+    }
+
+# =====================================================
 # DASHBOARD
-# ======================================================
+# =====================================================
 
 def dashboard():
 
@@ -241,34 +302,31 @@ def dashboard():
 
     timeframe = st.selectbox(
         "Select Timeframe",
-        ["5m", "15m", "30m", "60m", "1d"]
+        ["5min", "15min", "30min", "1h", "4h", "1day"]
     )
 
-    auto = st.checkbox("Auto Refresh")
+    auto_refresh = st.checkbox("Auto Refresh")
 
-    if auto:
+    if auto_refresh:
 
         time.sleep(30)
+
         st.rerun()
 
     if st.button("SCAN LIVE MARKET"):
 
-        count = 0
+        total = 0
 
-        for pair, ticker in markets.items():
+        for pair, symbol in markets.items():
 
             result = scan_market(
-                ticker,
+                symbol,
                 timeframe
             )
 
             if result:
 
-                count += 1
-
-                # ===============================
-                # COLOR
-                # ===============================
+                total += 1
 
                 if result["signal"] == "BUY":
                     cls = "buy"
@@ -278,10 +336,6 @@ def dashboard():
 
                 else:
                     cls = "neutral"
-
-                # ===============================
-                # CARD
-                # ===============================
 
                 st.markdown(f"""
 
@@ -296,20 +350,26 @@ def dashboard():
                 <b>Live Entry:</b>
                 {result["price"]}<br><br>
 
+                <b>RSI:</b>
+                {result["rsi"]}<br>
+
                 <b>EMA20:</b>
                 {result["ema20"]}<br>
 
                 <b>EMA50:</b>
                 {result["ema50"]}<br>
 
+                <b>MACD:</b>
+                {result["macd"]}<br>
+
+                <b>Confidence:</b>
+                {result["confidence"]}%<br>
+
                 <b>Take Profit:</b>
                 {result["tp"]}<br>
 
                 <b>Stop Loss:</b>
                 {result["sl"]}<br>
-
-                <b>Timeframe:</b>
-                {timeframe}<br>
 
                 <b>Updated:</b>
                 {datetime.now().strftime("%H:%M:%S")}
@@ -318,13 +378,13 @@ def dashboard():
 
                 """, unsafe_allow_html=True)
 
-        st.success(f"{count} LIVE SIGNALS GENERATED")
+        st.success(f"{total} LIVE SIGNALS GENERATED")
 
-# ======================================================
+# =====================================================
 # ROUTER
-# ======================================================
+# =====================================================
 
-if st.session_state.logged:
+if st.session_state.logged_in:
     dashboard()
 else:
-    login()
+    login_page()
