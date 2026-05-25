@@ -97,9 +97,7 @@ def login_page():
         if username and password:
 
             st.session_state.logged_in = True
-
             st.session_state.username = username
-
             st.rerun()
 
         else:
@@ -178,54 +176,65 @@ def get_signal(symbol, timeframe):
 
     try:
 
-        # ==========================================
-        # FIXED YFINANCE PERIODS
-        # ==========================================
+        # =================================================
+        # FIXED PERIODS
+        # =================================================
 
         if timeframe in ["5m", "15m", "30m"]:
             period = "1d"
 
-        elif timeframe in ["1h", "4h"]:
+        elif timeframe in ["60m", "90m"]:
             period = "7d"
 
         else:
             period = "1mo"
 
-        # ==========================================
-        # DOWNLOAD DATA
-        # ==========================================
+        # =================================================
+        # DOWNLOAD MARKET DATA
+        # =================================================
 
         data = yf.download(
             symbol,
             period=period,
             interval=timeframe,
-            progress=False
+            progress=False,
+            auto_adjust=True
         )
 
+        # =================================================
+        # CHECK DATA
+        # =================================================
+
+        if data is None:
+            return None
+
         if data.empty:
+            return None
+
+        if len(data) < 60:
             return None
 
         close = data["Close"]
 
         current_price = float(close.iloc[-1])
 
-        # ==========================================
+        # =================================================
         # EMA
-        # ==========================================
+        # =================================================
 
         ema20 = close.ewm(span=20).mean().iloc[-1]
 
         ema50 = close.ewm(span=50).mean().iloc[-1]
 
-        # ==========================================
+        # =================================================
         # RSI
-        # ==========================================
+        # =================================================
 
         rsi = calculate_rsi(close).iloc[-1]
 
-        # ==========================================
+        # =================================================
         # MACD
-        # ==========================================
+        # =================================================
 
         macd, macd_signal = calculate_macd(close)
 
@@ -233,16 +242,20 @@ def get_signal(symbol, timeframe):
 
         macd_signal_value = macd_signal.iloc[-1]
 
-        # ==========================================
-        # AI LOGIC
-        # ==========================================
+        # =================================================
+        # SIGNAL LOGIC
+        # =================================================
 
         confidence = 50
+
+        # EMA TREND
 
         if ema20 > ema50:
             confidence += 15
         else:
             confidence -= 15
+
+        # RSI
 
         if rsi > 55:
             confidence += 15
@@ -250,15 +263,17 @@ def get_signal(symbol, timeframe):
         elif rsi < 45:
             confidence -= 15
 
+        # MACD
+
         if macd_value > macd_signal_value:
             confidence += 20
 
         else:
             confidence -= 20
 
-        # ==========================================
-        # SIGNAL
-        # ==========================================
+        # =================================================
+        # FINAL SIGNAL
+        # =================================================
 
         signal = "NEUTRAL"
 
@@ -268,23 +283,31 @@ def get_signal(symbol, timeframe):
         elif confidence <= 35:
             signal = "SELL"
 
-        # ==========================================
+        # =================================================
         # TP / SL
-        # ==========================================
+        # =================================================
 
-        stop_loss = round(current_price * 0.995, 4)
+        if signal == "BUY":
 
-        take_profit = round(current_price * 1.010, 4)
+            stop_loss = round(current_price * 0.995, 4)
 
-        if signal == "SELL":
+            take_profit = round(current_price * 1.010, 4)
+
+        elif signal == "SELL":
 
             stop_loss = round(current_price * 1.005, 4)
 
             take_profit = round(current_price * 0.990, 4)
 
-        # ==========================================
-        # STRENGTH
-        # ==========================================
+        else:
+
+            stop_loss = current_price
+
+            take_profit = current_price
+
+        # =================================================
+        # TREND STRENGTH
+        # =================================================
 
         if confidence >= 80:
             strength = "VERY STRONG"
@@ -292,18 +315,25 @@ def get_signal(symbol, timeframe):
         elif confidence >= 65:
             strength = "STRONG"
 
-        else:
+        elif confidence >= 50:
             strength = "MODERATE"
+
+        else:
+            strength = "WEAK"
+
+        # =================================================
+        # RETURN
+        # =================================================
 
         return {
 
             "price": round(current_price, 4),
             "signal": signal,
             "confidence": confidence,
-            "ema20": round(ema20, 4),
-            "ema50": round(ema50, 4),
-            "rsi": round(rsi, 2),
-            "macd": round(macd_value, 4),
+            "ema20": round(float(ema20), 4),
+            "ema50": round(float(ema50), 4),
+            "rsi": round(float(rsi), 2),
+            "macd": round(float(macd_value), 4),
             "strength": strength,
             "tp": take_profit,
             "sl": stop_loss
@@ -357,32 +387,34 @@ def dashboard():
         col4.metric("User", st.session_state.username)
 
         st.markdown("""
+
         <div class="card">
 
-        <h2>20 UPGRADES ACTIVE</h2>
+        <h2>20+ UPGRADES ACTIVE</h2>
 
         ✔ Live Forex Scanner<br>
-        ✔ Live Metals Scanner<br>
-        ✔ Live Crypto Scanner<br>
-        ✔ Real EMA Analysis<br>
+        ✔ Metals Scanner<br>
+        ✔ Crypto Scanner<br>
         ✔ Real RSI Analysis<br>
+        ✔ Real EMA Analysis<br>
         ✔ Real MACD Analysis<br>
-        ✔ Live Entries<br>
-        ✔ Real Candles<br>
-        ✔ Timeframe Scanner<br>
+        ✔ Multi Timeframe Scanner<br>
         ✔ Scalping Mode<br>
         ✔ AI Confidence<br>
+        ✔ Telegram Ready<br>
+        ✔ Notifications<br>
+        ✔ VIP Signals<br>
         ✔ Live TP/SL<br>
         ✔ Trend Strength<br>
-        ✔ Auto Refresh<br>
-        ✔ VIP Signals<br>
-        ✔ Notifications<br>
-        ✔ Telegram Ready<br>
+        ✔ Cloud Hosted<br>
         ✔ Mobile Friendly<br>
-        ✔ Streamlit Cloud<br>
+        ✔ Real Entries<br>
+        ✔ Real Candles<br>
+        ✔ Auto Refresh<br>
         ✔ Professional UI<br>
 
         </div>
+
         """, unsafe_allow_html=True)
 
     # =================================================
@@ -395,7 +427,7 @@ def dashboard():
 
         timeframe = st.selectbox(
             "Select Timeframe",
-            ["5m", "15m", "30m", "1h", "4h", "1d"]
+            ["5m", "15m", "30m", "60m", "90m", "1d"]
         )
 
         auto_refresh = st.checkbox("Auto Refresh")
@@ -415,9 +447,13 @@ def dashboard():
                     timeframe
                 )
 
-                if result:
+                if result is not None:
 
                     results_found += 1
+
+                    # =====================================
+                    # SIGNAL COLORS
+                    # =====================================
 
                     if result["signal"] == "BUY":
                         signal_class = "buy"
@@ -427,6 +463,10 @@ def dashboard():
 
                     else:
                         signal_class = "neutral"
+
+                    # =====================================
+                    # CARD
+                    # =====================================
 
                     st.markdown(f"""
 
@@ -438,7 +478,7 @@ def dashboard():
                     {result["signal"]}
                     </p>
 
-                    <b>Entry:</b> {result["price"]}<br>
+                    <b>Live Entry:</b> {result["price"]}<br><br>
 
                     <b>RSI:</b> {result["rsi"]}<br>
 
@@ -448,10 +488,10 @@ def dashboard():
 
                     <b>MACD:</b> {result["macd"]}<br>
 
-                    <b>Confidence:</b>
+                    <b>AI Confidence:</b>
                     {result["confidence"]}%<br>
 
-                    <b>Strength:</b>
+                    <b>Trend Strength:</b>
                     {result["strength"]}<br>
 
                     <b>Take Profit:</b>
