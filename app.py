@@ -16,12 +16,6 @@ st.set_page_config(
 )
 
 # =====================================================
-# AUTO REFRESH
-# =====================================================
-
-st_autorefresh = st.empty()
-
-# =====================================================
 # CUSTOM CSS
 # =====================================================
 
@@ -54,7 +48,7 @@ st.markdown("""
 }
 
 .sell{
-    color:#ff4d6d;
+    color:#ff4d4d;
     font-size:28px;
     font-weight:bold;
 }
@@ -62,11 +56,6 @@ st.markdown("""
 .neutral{
     color:orange;
     font-size:28px;
-    font-weight:bold;
-}
-
-.vip{
-    color:gold;
     font-weight:bold;
 }
 
@@ -94,20 +83,27 @@ def login_page():
         unsafe_allow_html=True
     )
 
-    st.subheader("Professional AI Trading Scanner")
+    st.subheader("Professional AI Live Market Scanner")
 
     username = st.text_input("Username")
-    password = st.text_input("Password", type="password")
+
+    password = st.text_input(
+        "Password",
+        type="password"
+    )
 
     if st.button("LOGIN"):
 
         if username and password:
 
             st.session_state.logged_in = True
+
             st.session_state.username = username
+
             st.rerun()
 
         else:
+
             st.error("Enter username and password")
 
 # =====================================================
@@ -137,7 +133,7 @@ markets = {
 }
 
 # =====================================================
-# RSI
+# RSI FUNCTION
 # =====================================================
 
 def calculate_rsi(data, period=14):
@@ -159,7 +155,7 @@ def calculate_rsi(data, period=14):
     return rsi
 
 # =====================================================
-# MACD
+# MACD FUNCTION
 # =====================================================
 
 def calculate_macd(close):
@@ -182,9 +178,26 @@ def get_signal(symbol, timeframe):
 
     try:
 
+        # ==========================================
+        # FIXED YFINANCE PERIODS
+        # ==========================================
+
+        if timeframe in ["5m", "15m", "30m"]:
+            period = "1d"
+
+        elif timeframe in ["1h", "4h"]:
+            period = "7d"
+
+        else:
+            period = "1mo"
+
+        # ==========================================
+        # DOWNLOAD DATA
+        # ==========================================
+
         data = yf.download(
             symbol,
-            period="7d",
+            period=period,
             interval=timeframe,
             progress=False
         )
@@ -196,11 +209,23 @@ def get_signal(symbol, timeframe):
 
         current_price = float(close.iloc[-1])
 
+        # ==========================================
+        # EMA
+        # ==========================================
+
         ema20 = close.ewm(span=20).mean().iloc[-1]
 
         ema50 = close.ewm(span=50).mean().iloc[-1]
 
+        # ==========================================
+        # RSI
+        # ==========================================
+
         rsi = calculate_rsi(close).iloc[-1]
+
+        # ==========================================
+        # MACD
+        # ==========================================
 
         macd, macd_signal = calculate_macd(close)
 
@@ -208,23 +233,16 @@ def get_signal(symbol, timeframe):
 
         macd_signal_value = macd_signal.iloc[-1]
 
+        # ==========================================
+        # AI LOGIC
+        # ==========================================
+
         confidence = 50
-
-        signal = "NEUTRAL"
-
-        # =====================================
-        # EMA TREND
-        # =====================================
 
         if ema20 > ema50:
             confidence += 15
-
         else:
             confidence -= 15
-
-        # =====================================
-        # RSI
-        # =====================================
 
         if rsi > 55:
             confidence += 15
@@ -232,19 +250,17 @@ def get_signal(symbol, timeframe):
         elif rsi < 45:
             confidence -= 15
 
-        # =====================================
-        # MACD
-        # =====================================
-
         if macd_value > macd_signal_value:
             confidence += 20
 
         else:
             confidence -= 20
 
-        # =====================================
-        # FINAL SIGNAL
-        # =====================================
+        # ==========================================
+        # SIGNAL
+        # ==========================================
+
+        signal = "NEUTRAL"
 
         if confidence >= 65:
             signal = "BUY"
@@ -252,12 +268,9 @@ def get_signal(symbol, timeframe):
         elif confidence <= 35:
             signal = "SELL"
 
-        else:
-            signal = "NEUTRAL"
-
-        # =====================================
+        # ==========================================
         # TP / SL
-        # =====================================
+        # ==========================================
 
         stop_loss = round(current_price * 0.995, 4)
 
@@ -269,9 +282,9 @@ def get_signal(symbol, timeframe):
 
             take_profit = round(current_price * 0.990, 4)
 
-        # =====================================
-        # TREND STRENGTH
-        # =====================================
+        # ==========================================
+        # STRENGTH
+        # ==========================================
 
         if confidence >= 80:
             strength = "VERY STRONG"
@@ -300,7 +313,7 @@ def get_signal(symbol, timeframe):
         return None
 
 # =====================================================
-# MAIN DASHBOARD
+# DASHBOARD
 # =====================================================
 
 def dashboard():
@@ -334,7 +347,7 @@ def dashboard():
             unsafe_allow_html=True
         )
 
-        st.success("LIVE AI MARKET SCANNER ACTIVE")
+        st.success("LIVE MARKET SCANNER ACTIVE")
 
         col1, col2, col3, col4 = st.columns(4)
 
@@ -346,27 +359,27 @@ def dashboard():
         st.markdown("""
         <div class="card">
 
-        <h2>20+ UPGRADES ACTIVE</h2>
+        <h2>20 UPGRADES ACTIVE</h2>
 
         ✔ Live Forex Scanner<br>
-        ✔ Metals Scanner<br>
-        ✔ Crypto Scanner<br>
-        ✔ Real RSI Analysis<br>
+        ✔ Live Metals Scanner<br>
+        ✔ Live Crypto Scanner<br>
         ✔ Real EMA Analysis<br>
+        ✔ Real RSI Analysis<br>
         ✔ Real MACD Analysis<br>
-        ✔ Multi Timeframe Scanner<br>
+        ✔ Live Entries<br>
+        ✔ Real Candles<br>
+        ✔ Timeframe Scanner<br>
         ✔ Scalping Mode<br>
         ✔ AI Confidence<br>
-        ✔ Telegram Ready<br>
-        ✔ Notifications<br>
-        ✔ VIP Signals<br>
         ✔ Live TP/SL<br>
         ✔ Trend Strength<br>
-        ✔ Cloud Hosted<br>
-        ✔ Mobile Friendly<br>
-        ✔ Real Entries<br>
-        ✔ Real Candles<br>
         ✔ Auto Refresh<br>
+        ✔ VIP Signals<br>
+        ✔ Notifications<br>
+        ✔ Telegram Ready<br>
+        ✔ Mobile Friendly<br>
+        ✔ Streamlit Cloud<br>
         ✔ Professional UI<br>
 
         </div>
@@ -393,17 +406,18 @@ def dashboard():
 
         if st.button("SCAN LIVE MARKET"):
 
-            st.subheader("LIVE SIGNALS")
-
-            total = 0
+            results_found = 0
 
             for pair, ticker in markets.items():
 
-                result = get_signal(ticker, timeframe)
+                result = get_signal(
+                    ticker,
+                    timeframe
+                )
 
                 if result:
 
-                    total += 1
+                    results_found += 1
 
                     if result["signal"] == "BUY":
                         signal_class = "buy"
@@ -415,6 +429,7 @@ def dashboard():
                         signal_class = "neutral"
 
                     st.markdown(f"""
+
                     <div class="card">
 
                     <h2>{pair}</h2>
@@ -433,23 +448,31 @@ def dashboard():
 
                     <b>MACD:</b> {result["macd"]}<br>
 
-                    <b>Confidence:</b> {result["confidence"]}%<br>
+                    <b>Confidence:</b>
+                    {result["confidence"]}%<br>
 
-                    <b>Strength:</b> {result["strength"]}<br>
+                    <b>Strength:</b>
+                    {result["strength"]}<br>
 
-                    <b>Take Profit:</b> {result["tp"]}<br>
+                    <b>Take Profit:</b>
+                    {result["tp"]}<br>
 
-                    <b>Stop Loss:</b> {result["sl"]}<br>
+                    <b>Stop Loss:</b>
+                    {result["sl"]}<br>
 
-                    <b>Timeframe:</b> {timeframe}<br>
+                    <b>Timeframe:</b>
+                    {timeframe}<br>
 
                     <b>Updated:</b>
                     {datetime.now().strftime("%H:%M:%S")}
 
                     </div>
+
                     """, unsafe_allow_html=True)
 
-            st.success(f"{total} LIVE SIGNALS GENERATED")
+            st.success(
+                f"{results_found} LIVE SIGNALS GENERATED"
+            )
 
     # =================================================
     # OTHER MENUS
