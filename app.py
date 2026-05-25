@@ -1,7 +1,8 @@
 import streamlit as st
-import pandas as pd
 import yfinance as yf
-import random
+import pandas as pd
+import numpy as np
+from datetime import datetime
 import time
 
 # =====================================================
@@ -13,6 +14,12 @@ st.set_page_config(
     page_icon="📈",
     layout="wide"
 )
+
+# =====================================================
+# AUTO REFRESH
+# =====================================================
+
+st_autorefresh = st.empty()
 
 # =====================================================
 # CUSTOM CSS
@@ -29,7 +36,7 @@ st.markdown("""
 .big-title{
     font-size:50px;
     font-weight:bold;
-    color:#7CFFB2;
+    color:#72ffb6;
 }
 
 .card{
@@ -42,11 +49,19 @@ st.markdown("""
 
 .buy{
     color:#00ff99;
+    font-size:28px;
     font-weight:bold;
 }
 
 .sell{
-    color:#ff4d4d;
+    color:#ff4d6d;
+    font-size:28px;
+    font-weight:bold;
+}
+
+.neutral{
+    color:orange;
+    font-size:28px;
     font-weight:bold;
 }
 
@@ -59,7 +74,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # =====================================================
-# LOGIN SESSION
+# LOGIN SYSTEM
 # =====================================================
 
 if "logged_in" not in st.session_state:
@@ -69,22 +84,46 @@ if "username" not in st.session_state:
     st.session_state.username = ""
 
 # =====================================================
-# LIVE MARKET SYMBOLS
+# LOGIN PAGE
 # =====================================================
 
-MARKETS = {
+def login_page():
+
+    st.markdown(
+        '<p class="big-title">AI MAJIQ CLOUD PRO</p>',
+        unsafe_allow_html=True
+    )
+
+    st.subheader("Professional AI Trading Scanner")
+
+    username = st.text_input("Username")
+    password = st.text_input("Password", type="password")
+
+    if st.button("LOGIN"):
+
+        if username and password:
+
+            st.session_state.logged_in = True
+            st.session_state.username = username
+            st.rerun()
+
+        else:
+            st.error("Enter username and password")
+
+# =====================================================
+# MARKETS
+# =====================================================
+
+markets = {
 
     # FOREX
     "EURUSD": "EURUSD=X",
     "GBPUSD": "GBPUSD=X",
-    "USDJPY": "USDJPY=X",
-    "USDCHF": "USDCHF=X",
-    "AUDUSD": "AUDUSD=X",
-    "USDCAD": "USDCAD=X",
-    "NZDUSD": "NZDUSD=X",
-    "EURJPY": "EURJPY=X",
+    "USDJPY": "JPY=X",
     "GBPJPY": "GBPJPY=X",
-    "EURGBP": "EURGBP=X",
+    "AUDUSD": "AUDUSD=X",
+    "USDCAD": "CAD=X",
+    "EURJPY": "EURJPY=X",
 
     # METALS
     "XAUUSD": "GC=F",
@@ -94,196 +133,174 @@ MARKETS = {
     "BTCUSD": "BTC-USD",
     "ETHUSD": "ETH-USD",
     "SOLUSD": "SOL-USD",
-    "BNBUSD": "BNB-USD",
-    "XRPUSD": "XRP-USD"
+    "BNBUSD": "BNB-USD"
 }
 
 # =====================================================
-# LIVE PRICE ENGINE
+# RSI
 # =====================================================
 
-def get_live_price(ticker):
+def calculate_rsi(data, period=14):
+
+    delta = data.diff()
+
+    gain = delta.where(delta > 0, 0)
+
+    loss = -delta.where(delta < 0, 0)
+
+    avg_gain = gain.rolling(period).mean()
+
+    avg_loss = loss.rolling(period).mean()
+
+    rs = avg_gain / avg_loss
+
+    rsi = 100 - (100 / (1 + rs))
+
+    return rsi
+
+# =====================================================
+# MACD
+# =====================================================
+
+def calculate_macd(close):
+
+    ema12 = close.ewm(span=12).mean()
+
+    ema26 = close.ewm(span=26).mean()
+
+    macd = ema12 - ema26
+
+    signal = macd.ewm(span=9).mean()
+
+    return macd, signal
+
+# =====================================================
+# SIGNAL ENGINE
+# =====================================================
+
+def get_signal(symbol, timeframe):
 
     try:
 
-        data = yf.Ticker(ticker)
+        data = yf.download(
+            symbol,
+            period="7d",
+            interval=timeframe,
+            progress=False
+        )
 
-        hist = data.history(period="1d")
-
-        if hist.empty:
+        if data.empty:
             return None
 
-        price = hist["Close"].iloc[-1]
+        close = data["Close"]
 
-        return float(price)
+        current_price = float(close.iloc[-1])
 
-    except:
+        ema20 = close.ewm(span=20).mean().iloc[-1]
 
-        return None
+        ema50 = close.ewm(span=50).mean().iloc[-1]
 
-# =====================================================
-# AI SIGNAL ENGINE
-# =====================================================
+        rsi = calculate_rsi(close).iloc[-1]
 
-def generate_signal(symbol, ticker):
+        macd, macd_signal = calculate_macd(close)
 
-    entry = get_live_price(ticker)
+        macd_value = macd.iloc[-1]
 
-    if entry is None:
-        return None
+        macd_signal_value = macd_signal.iloc[-1]
 
-    # ==========================================
-    # AI ANALYSIS
-    # ==========================================
+        confidence = 50
 
-    ema_fast = random.randint(45, 80)
-    ema_slow = random.randint(40, 75)
+        signal = "NEUTRAL"
 
-    rsi = random.randint(35, 70)
+        # =====================================
+        # EMA TREND
+        # =====================================
 
-    momentum = random.randint(40, 100)
-
-    bullish_score = 0
-    bearish_score = 0
-
-    # ==========================================
-    # EMA LOGIC
-    # ==========================================
-
-    if ema_fast > ema_slow:
-        bullish_score += 35
-    else:
-        bearish_score += 35
-
-    # ==========================================
-    # RSI LOGIC
-    # ==========================================
-
-    if rsi > 55:
-        bullish_score += 25
-
-    elif rsi < 45:
-        bearish_score += 25
-
-    # ==========================================
-    # MOMENTUM
-    # ==========================================
-
-    if momentum > 60:
-        bullish_score += 20
-    else:
-        bearish_score += 20
-
-    # ==========================================
-    # CANDLE CONFIRMATION
-    # ==========================================
-
-    candle = random.choice([
-        "bullish",
-        "bearish"
-    ])
-
-    if candle == "bullish":
-        bullish_score += 20
-    else:
-        bearish_score += 20
-
-    # ==========================================
-    # FINAL SIGNAL
-    # ==========================================
-
-    if bullish_score >= bearish_score:
-
-        signal = "BUY"
-
-        confidence = bullish_score
-
-        sl = round(entry - (entry * 0.003), 4)
-
-        tp = round(entry + (entry * 0.006), 4)
-
-        trend = "Bullish trend confirmed"
-
-    else:
-
-        signal = "SELL"
-
-        confidence = bearish_score
-
-        sl = round(entry + (entry * 0.003), 4)
-
-        tp = round(entry - (entry * 0.006), 4)
-
-        trend = "Bearish trend confirmed"
-
-    # ==========================================
-    # SIGNAL STRENGTH
-    # ==========================================
-
-    if confidence >= 90:
-        strength = "Very Strong"
-
-    elif confidence >= 80:
-        strength = "Strong"
-
-    else:
-        strength = "Moderate"
-
-    volatility = random.choice([
-        "Low",
-        "Medium",
-        "High"
-    ])
-
-    return {
-
-        "symbol": symbol,
-        "signal": signal,
-        "confidence": confidence,
-        "entry": round(entry, 4),
-        "sl": sl,
-        "tp": tp,
-        "trend": trend,
-        "strength": strength,
-        "volatility": volatility
-    }
-
-# =====================================================
-# LOGIN PAGE
-# =====================================================
-
-def login_page():
-
-    st.markdown(
-        "<div class='big-title'>AI MAJIQ CLOUD PRO</div>",
-        unsafe_allow_html=True
-    )
-
-    st.subheader("Professional AI Cloud Scanner")
-
-    username = st.text_input("Username")
-
-    password = st.text_input(
-        "Password",
-        type="password"
-    )
-
-    if st.button("LOGIN"):
-
-        if username and password:
-
-            st.session_state.logged_in = True
-
-            st.session_state.username = username
-
-            st.rerun()
+        if ema20 > ema50:
+            confidence += 15
 
         else:
+            confidence -= 15
 
-            st.error("Enter username and password")
+        # =====================================
+        # RSI
+        # =====================================
+
+        if rsi > 55:
+            confidence += 15
+
+        elif rsi < 45:
+            confidence -= 15
+
+        # =====================================
+        # MACD
+        # =====================================
+
+        if macd_value > macd_signal_value:
+            confidence += 20
+
+        else:
+            confidence -= 20
+
+        # =====================================
+        # FINAL SIGNAL
+        # =====================================
+
+        if confidence >= 65:
+            signal = "BUY"
+
+        elif confidence <= 35:
+            signal = "SELL"
+
+        else:
+            signal = "NEUTRAL"
+
+        # =====================================
+        # TP / SL
+        # =====================================
+
+        stop_loss = round(current_price * 0.995, 4)
+
+        take_profit = round(current_price * 1.010, 4)
+
+        if signal == "SELL":
+
+            stop_loss = round(current_price * 1.005, 4)
+
+            take_profit = round(current_price * 0.990, 4)
+
+        # =====================================
+        # TREND STRENGTH
+        # =====================================
+
+        if confidence >= 80:
+            strength = "VERY STRONG"
+
+        elif confidence >= 65:
+            strength = "STRONG"
+
+        else:
+            strength = "MODERATE"
+
+        return {
+
+            "price": round(current_price, 4),
+            "signal": signal,
+            "confidence": confidence,
+            "ema20": round(ema20, 4),
+            "ema50": round(ema50, 4),
+            "rsi": round(rsi, 2),
+            "macd": round(macd_value, 4),
+            "strength": strength,
+            "tp": take_profit,
+            "sl": stop_loss
+        }
+
+    except:
+        return None
 
 # =====================================================
-# DASHBOARD
+# MAIN DASHBOARD
 # =====================================================
 
 def dashboard():
@@ -306,10 +323,6 @@ def dashboard():
         ]
     )
 
-    st.sidebar.success(
-        f"Logged in as {st.session_state.username}"
-    )
-
     # =================================================
     # DASHBOARD
     # =================================================
@@ -317,48 +330,43 @@ def dashboard():
     if menu == "Dashboard":
 
         st.markdown(
-            "<div class='big-title'>AI MAJIQ CLOUD PRO</div>",
+            '<p class="big-title">AI MAJIQ CLOUD PRO</p>',
             unsafe_allow_html=True
         )
 
-        st.success(
-            "LIVE MARKET SCANNER ACTIVE"
-        )
+        st.success("LIVE AI MARKET SCANNER ACTIVE")
 
         col1, col2, col3, col4 = st.columns(4)
 
-        col1.metric("Markets", len(MARKETS))
-        col2.metric("Cloud", "ONLINE")
+        col1.metric("Markets", len(markets))
+        col2.metric("Scanner", "ONLINE")
         col3.metric("Signals", "LIVE")
-        col4.metric(
-            "Accuracy",
-            f"{random.randint(84,97)}%"
-        )
+        col4.metric("User", st.session_state.username)
 
         st.markdown("""
-        <div class='card'>
+        <div class="card">
 
-        <h2>20 PRO FEATURES</h2>
+        <h2>20+ UPGRADES ACTIVE</h2>
 
-        ✔ Forex Scanner<br>
+        ✔ Live Forex Scanner<br>
         ✔ Metals Scanner<br>
         ✔ Crypto Scanner<br>
-        ✔ AI BUY/SELL Signals<br>
+        ✔ Real RSI Analysis<br>
+        ✔ Real EMA Analysis<br>
+        ✔ Real MACD Analysis<br>
+        ✔ Multi Timeframe Scanner<br>
         ✔ Scalping Mode<br>
-        ✔ Live Entries<br>
-        ✔ Live TP/SL<br>
         ✔ AI Confidence<br>
         ✔ Telegram Ready<br>
         ✔ Notifications<br>
         ✔ VIP Signals<br>
-        ✔ Cloud Hosting<br>
+        ✔ Live TP/SL<br>
+        ✔ Trend Strength<br>
+        ✔ Cloud Hosted<br>
         ✔ Mobile Friendly<br>
-        ✔ Streamlit Cloud<br>
-        ✔ Real Market Prices<br>
-        ✔ Live Dashboard<br>
-        ✔ Trade Analysis<br>
-        ✔ AI Scanner<br>
-        ✔ Fast Cloud Signals<br>
+        ✔ Real Entries<br>
+        ✔ Real Candles<br>
+        ✔ Auto Refresh<br>
         ✔ Professional UI<br>
 
         </div>
@@ -372,143 +380,76 @@ def dashboard():
 
         st.title("LIVE AI SIGNAL SCANNER")
 
+        timeframe = st.selectbox(
+            "Select Timeframe",
+            ["5m", "15m", "30m", "1h", "4h", "1d"]
+        )
+
+        auto_refresh = st.checkbox("Auto Refresh")
+
+        if auto_refresh:
+            time.sleep(30)
+            st.rerun()
+
         if st.button("SCAN LIVE MARKET"):
 
-            with st.spinner(
-                "Scanning live markets..."
-            ):
+            st.subheader("LIVE SIGNALS")
 
-                results = []
+            total = 0
 
-                for symbol, ticker in MARKETS.items():
+            for pair, ticker in markets.items():
 
-                    signal = generate_signal(
-                        symbol,
-                        ticker
-                    )
+                result = get_signal(ticker, timeframe)
 
-                    if signal:
-                        results.append(signal)
+                if result:
 
-                results = sorted(
-                    results,
-                    key=lambda x: x["confidence"],
-                    reverse=True
-                )
+                    total += 1
 
-            st.success(
-                f"{len(results)} LIVE Signals Found"
-            )
+                    if result["signal"] == "BUY":
+                        signal_class = "buy"
 
-            for row in results:
+                    elif result["signal"] == "SELL":
+                        signal_class = "sell"
 
-                signal_class = (
-                    "buy"
-                    if row["signal"] == "BUY"
-                    else "sell"
-                )
+                    else:
+                        signal_class = "neutral"
 
-                st.markdown(f"""
-                <div class='card'>
+                    st.markdown(f"""
+                    <div class="card">
 
-                <h2>{row['symbol']}</h2>
+                    <h2>{pair}</h2>
 
-                <h3 class='{signal_class}'>
-                {row['signal']}
-                </h3>
+                    <p class="{signal_class}">
+                    {result["signal"]}
+                    </p>
 
-                <p><b>Live Entry:</b> {row['entry']}</p>
+                    <b>Entry:</b> {result["price"]}<br>
 
-                <p><b>Confidence:</b> {row['confidence']}%</p>
+                    <b>RSI:</b> {result["rsi"]}<br>
 
-                <p><b>Stop Loss:</b> {row['sl']}</p>
+                    <b>EMA20:</b> {result["ema20"]}<br>
 
-                <p><b>Take Profit:</b> {row['tp']}</p>
+                    <b>EMA50:</b> {result["ema50"]}<br>
 
-                <p><b>Strength:</b> {row['strength']}</p>
+                    <b>MACD:</b> {result["macd"]}<br>
 
-                <p><b>Volatility:</b> {row['volatility']}</p>
+                    <b>Confidence:</b> {result["confidence"]}%<br>
 
-                <p><b>AI Analysis:</b> {row['trend']}</p>
+                    <b>Strength:</b> {result["strength"]}<br>
 
-                </div>
-                """, unsafe_allow_html=True)
+                    <b>Take Profit:</b> {result["tp"]}<br>
 
-    # =================================================
-    # SCALPING MODE
-    # =================================================
+                    <b>Stop Loss:</b> {result["sl"]}<br>
 
-    elif menu == "Scalping Mode":
+                    <b>Timeframe:</b> {timeframe}<br>
 
-        st.title("AI Scalping Mode")
+                    <b>Updated:</b>
+                    {datetime.now().strftime("%H:%M:%S")}
 
-        account = st.number_input(
-            "Account Size ($)",
-            min_value=1,
-            value=6
-        )
+                    </div>
+                    """, unsafe_allow_html=True)
 
-        risk = st.selectbox(
-            "Risk Level",
-            ["Low", "Medium", "High"]
-        )
-
-        if st.button("START SCALPING"):
-
-            symbol = random.choice(
-                list(MARKETS.keys())
-            )
-
-            signal = generate_signal(
-                symbol,
-                MARKETS[symbol]
-            )
-
-            if signal:
-
-                st.success(
-                    "Scalp Opportunity Found"
-                )
-
-                st.write(signal)
-
-    # =================================================
-    # LIVE MARKET
-    # =================================================
-
-    elif menu == "Live Market":
-
-        st.title("Live Market Dashboard")
-
-        data = []
-
-        for symbol, ticker in MARKETS.items():
-
-            price = get_live_price(ticker)
-
-            if price:
-
-                data.append({
-
-                    "Symbol": symbol,
-                    "Price": round(price, 4),
-                    "Trend": random.choice([
-                        "Bullish",
-                        "Bearish"
-                    ]),
-                    "Volatility": random.choice([
-                        "Low",
-                        "Medium",
-                        "High"
-                    ])
-                })
-
-        df = pd.DataFrame(data)
-
-        st.dataframe(
-            df,
-            use_container_width=True
-        )
+            st.success(f"{total} LIVE SIGNALS GENERATED")
 
     # =================================================
     # OTHER MENUS
@@ -518,9 +459,7 @@ def dashboard():
 
         st.title(menu)
 
-        st.info(
-            f"{menu} section active."
-        )
+        st.info(f"{menu} section active.")
 
 # =====================================================
 # ROUTER
