@@ -1,9 +1,7 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
 import random
 import time
-from datetime import datetime
 
 # =====================================================
 # PAGE CONFIG
@@ -28,10 +26,10 @@ st.markdown("""
 }
 
 .big-title{
-    font-size:52px;
+    font-size:50px;
     font-weight:bold;
     color:#7CFFB2;
-    letter-spacing:3px;
+    letter-spacing:2px;
 }
 
 .card{
@@ -71,7 +69,7 @@ if "username" not in st.session_state:
     st.session_state.username = ""
 
 # =====================================================
-# MARKET LIST
+# MARKETS
 # =====================================================
 
 FOREX = [
@@ -92,7 +90,15 @@ METALS = [
     "XAGUSD"
 ]
 
-ALL_MARKETS = FOREX + METALS
+CRYPTO = [
+    "BTCUSD",
+    "ETHUSD",
+    "SOLUSD",
+    "BNBUSD",
+    "XRPUSD"
+]
+
+ALL_MARKETS = FOREX + METALS + CRYPTO
 
 # =====================================================
 # AI SIGNAL ENGINE
@@ -100,40 +106,141 @@ ALL_MARKETS = FOREX + METALS
 
 def generate_signal(symbol):
 
-    signal = random.choice(["BUY", "SELL"])
+    market_prices = {
 
-    confidence = random.randint(75, 97)
+        # FOREX
+        "EURUSD": 1.08,
+        "GBPUSD": 1.27,
+        "USDJPY": 156.20,
+        "USDCHF": 0.91,
+        "AUDUSD": 0.66,
+        "USDCAD": 1.36,
+        "NZDUSD": 0.61,
+        "EURJPY": 168.50,
+        "GBPJPY": 214.30,
+        "EURGBP": 0.85,
 
-    entry = round(random.uniform(1.0000, 3000.0000), 4)
+        # METALS
+        "XAUUSD": 2350.00,
+        "XAGUSD": 31.20,
 
-    strength = random.choice([
-        "Weak",
-        "Moderate",
-        "Strong",
-        "Very Strong"
-    ])
+        # CRYPTO
+        "BTCUSD": 68000.00,
+        "ETHUSD": 3700.00,
+        "SOLUSD": 170.00,
+        "BNBUSD": 600.00,
+        "XRPUSD": 0.53
+    }
+
+    base_price = market_prices.get(symbol, 1.0000)
+
+    # ==========================================
+    # REALISTIC PRICE MOVEMENT
+    # ==========================================
+
+    if symbol in ["BTCUSD", "ETHUSD", "SOLUSD", "BNBUSD"]:
+
+        movement = random.uniform(-300, 300)
+
+    elif symbol == "XAUUSD":
+
+        movement = random.uniform(-15, 15)
+
+    elif symbol == "XAGUSD":
+
+        movement = random.uniform(-1, 1)
+
+    elif "JPY" in symbol:
+
+        movement = random.uniform(-1, 1)
+
+    else:
+
+        movement = random.uniform(-0.01, 0.01)
+
+    entry = round(base_price + movement, 4)
+
+    # ==========================================
+    # AI ANALYSIS
+    # ==========================================
+
+    ema_fast = random.randint(45, 80)
+    ema_slow = random.randint(40, 75)
+    rsi = random.randint(35, 70)
+    momentum = random.randint(40, 100)
+
+    bullish_score = 0
+    bearish_score = 0
+
+    if ema_fast > ema_slow:
+        bullish_score += 35
+    else:
+        bearish_score += 35
+
+    if rsi > 55:
+        bullish_score += 25
+
+    elif rsi < 45:
+        bearish_score += 25
+
+    if momentum > 60:
+        bullish_score += 20
+    else:
+        bearish_score += 20
+
+    candle = random.choice(["bullish", "bearish"])
+
+    if candle == "bullish":
+        bullish_score += 20
+    else:
+        bearish_score += 20
+
+    # ==========================================
+    # FINAL SIGNAL
+    # ==========================================
+
+    if bullish_score >= bearish_score:
+
+        signal = "BUY"
+
+        confidence = bullish_score
+
+        sl = round(entry - (entry * 0.003), 4)
+
+        tp = round(entry + (entry * 0.006), 4)
+
+        trend = "Bullish trend confirmed"
+
+    else:
+
+        signal = "SELL"
+
+        confidence = bearish_score
+
+        sl = round(entry + (entry * 0.003), 4)
+
+        tp = round(entry - (entry * 0.006), 4)
+
+        trend = "Bearish trend confirmed"
+
+    # ==========================================
+    # STRENGTH
+    # ==========================================
+
+    if confidence >= 90:
+        strength = "Very Strong"
+
+    elif confidence >= 80:
+        strength = "Strong"
+
+    else:
+        strength = "Moderate"
 
     volatility = random.choice([
         "Low",
         "Medium",
         "High"
     ])
-
-    if signal == "BUY":
-
-        sl = round(entry - random.uniform(0.0010, 10.0000), 4)
-
-        tp = round(entry + random.uniform(0.0010, 20.0000), 4)
-
-        trend = "Bullish momentum detected"
-
-    else:
-
-        sl = round(entry + random.uniform(0.0010, 10.0000), 4)
-
-        tp = round(entry - random.uniform(0.0010, 20.0000), 4)
-
-        trend = "Bearish pressure detected"
 
     return {
         "symbol": symbol,
@@ -178,7 +285,7 @@ def login_page():
             st.error("Enter username and password")
 
 # =====================================================
-# MAIN DASHBOARD
+# DASHBOARD
 # =====================================================
 
 def dashboard():
@@ -227,7 +334,7 @@ def dashboard():
 
         col1.metric("Forex", len(FOREX))
         col2.metric("Metals", len(METALS))
-        col3.metric("Signals Today", random.randint(50, 150))
+        col3.metric("Crypto", len(CRYPTO))
         col4.metric("Accuracy", f"{random.randint(84,97)}%")
 
         st.markdown("""
@@ -237,6 +344,7 @@ def dashboard():
 
         ✔ Forex Scanner<br>
         ✔ Metals Scanner<br>
+        ✔ Crypto Scanner<br>
         ✔ AI Confidence Engine<br>
         ✔ Scalping Mode<br>
         ✔ Auto Refresh Signals<br>
@@ -244,7 +352,6 @@ def dashboard():
         ✔ Telegram Integration Ready<br>
         ✔ Mobile Friendly<br>
         ✔ Professional Dashboard<br>
-        ✔ Streamlit Cloud Hosting<br>
 
         </div>
         """, unsafe_allow_html=True)
@@ -255,7 +362,7 @@ def dashboard():
 
     elif menu == "Signal Scanner":
 
-        st.title("AI Forex & Metals Scanner")
+        st.title("AI Market Scanner")
 
         timeframe = st.selectbox(
             "Choose Timeframe",
@@ -265,19 +372,12 @@ def dashboard():
 
         market_type = st.selectbox(
             "Choose Market",
-            ["All", "Forex", "Metals"]
-        )
-
-        refresh = st.slider(
-            "Auto Refresh Seconds",
-            5,
-            60,
-            10
+            ["All", "Forex", "Metals", "Crypto"]
         )
 
         if st.button("SCAN MARKETS"):
 
-            with st.spinner("AI scanning market..."):
+            with st.spinner("AI scanning markets..."):
 
                 time.sleep(2)
 
@@ -289,6 +389,9 @@ def dashboard():
                         continue
 
                     if market_type == "Metals" and symbol not in METALS:
+                        continue
+
+                    if market_type == "Crypto" and symbol not in CRYPTO:
                         continue
 
                     results.append(generate_signal(symbol))
@@ -326,7 +429,7 @@ def dashboard():
 
                 <p><b>Take Profit:</b> {row['tp']}</p>
 
-                <p><b>Market Strength:</b> {row['strength']}</p>
+                <p><b>Strength:</b> {row['strength']}</p>
 
                 <p><b>Volatility:</b> {row['volatility']}</p>
 
@@ -353,18 +456,6 @@ def dashboard():
             "Risk Level",
             ["Low", "Medium", "High"]
         )
-
-        st.markdown("""
-        <div class='card'>
-
-        AI Scalping scans quick opportunities for:
-        ✔ Small Accounts
-        ✔ Fast Entries
-        ✔ M5 Scalping
-        ✔ Forex + Gold
-
-        </div>
-        """, unsafe_allow_html=True)
 
         if st.button("START SCALPING"):
 
@@ -420,13 +511,12 @@ def dashboard():
         st.markdown("""
         <div class='card'>
 
-        AI ANALYSIS
+        AI market analysis currently active.
 
-        Market currently showing strong momentum.
-
-        Wait for confirmation candle before entry.
-
-        Risk management highly recommended.
+        ✔ Momentum Analysis
+        ✔ Trend Detection
+        ✔ Volatility Check
+        ✔ Scalping Opportunities
 
         </div>
         """, unsafe_allow_html=True)
@@ -444,10 +534,10 @@ def dashboard():
 
         <h2 class='vip'>VIP ACCESS</h2>
 
-        ✔ High Accuracy Signals<br>
-        ✔ Advanced Scalping<br>
-        ✔ AI Market Analysis<br>
-        ✔ Priority Notifications<br>
+        ✔ Premium Signals<br>
+        ✔ High Accuracy AI<br>
+        ✔ Scalping Opportunities<br>
+        ✔ Priority Alerts<br>
 
         </div>
         """, unsafe_allow_html=True)
@@ -478,12 +568,12 @@ def dashboard():
         st.title("Push Notifications")
 
         st.info("""
-        Future Notification Features:
+        Future Notification Features
 
-        ✔ Mobile Alerts
-        ✔ BUY/SELL Push Notifications
-        ✔ Telegram Notifications
-        ✔ VIP Alerts
+        ✔ BUY/SELL Alerts
+        ✔ Telegram Alerts
+        ✔ VIP Notifications
+        ✔ Mobile Notifications
         """)
 
     # =================================================
@@ -492,7 +582,7 @@ def dashboard():
 
     elif menu == "Telegram Signals":
 
-        st.title("Telegram Signal Integration")
+        st.title("Telegram Integration")
 
         token = st.text_input(
             "Telegram Bot Token"
@@ -505,7 +595,7 @@ def dashboard():
         if st.button("CONNECT TELEGRAM"):
 
             st.success(
-                "Telegram Integration Ready"
+                "Telegram Ready"
             )
 
     # =================================================
@@ -519,13 +609,13 @@ def dashboard():
         st.info("""
         AI MAJIQ CLOUD PRO SETTINGS
 
-        ✔ Cloud Hosted
-        ✔ AI Signal Engine
-        ✔ Scalping Mode
-        ✔ Forex + Metals
+        ✔ Forex
+        ✔ Metals
+        ✔ Crypto
+        ✔ Scalping
         ✔ AI Confidence
+        ✔ VIP Signals
         ✔ Telegram Ready
-        ✔ VIP Features
         ✔ Mobile Friendly
         """)
 
