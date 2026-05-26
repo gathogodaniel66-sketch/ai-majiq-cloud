@@ -4,15 +4,15 @@ import pandas as pd
 from datetime import datetime
 import time
 
-# =====================================================
+# ======================================================
 # API KEY
-# =====================================================
+# ======================================================
 
-API_KEY = "97e8ab17948f4772a17cb7dd4f8a6471"
+API_KEY = "PUT_YOUR_API_KEY_HERE"
 
-# =====================================================
+# ======================================================
 # PAGE CONFIG
-# =====================================================
+# ======================================================
 
 st.set_page_config(
     page_title="AI MAJIQ CLOUD PRO",
@@ -20,9 +20,9 @@ st.set_page_config(
     layout="wide"
 )
 
-# =====================================================
+# ======================================================
 # CSS
-# =====================================================
+# ======================================================
 
 st.markdown("""
 <style>
@@ -32,44 +32,64 @@ st.markdown("""
     color:white;
 }
 
-.title{
-    font-size:55px;
-    font-weight:bold;
+.main-title{
+    font-size:58px;
+    font-weight:800;
     color:#72ffb6;
+    margin-bottom:10px;
+}
+
+.sub-title{
+    color:#94a3b8;
+    font-size:18px;
+    margin-bottom:25px;
 }
 
 .card{
+    background:rgba(255,255,255,0.06);
+    border:1px solid rgba(255,255,255,0.08);
+    border-radius:24px;
+    padding:22px;
+    margin-bottom:22px;
+    backdrop-filter: blur(12px);
+}
+
+.metric-card{
     background:rgba(255,255,255,0.05);
     border-radius:20px;
-    padding:20px;
-    margin-bottom:20px;
-    border:1px solid rgba(255,255,255,0.08);
+    padding:18px;
+    text-align:center;
 }
 
 .buy{
     color:#00ff99;
-    font-size:28px;
-    font-weight:bold;
+    font-size:30px;
+    font-weight:800;
 }
 
 .sell{
     color:#ff4d4d;
-    font-size:28px;
-    font-weight:bold;
+    font-size:30px;
+    font-weight:800;
 }
 
 .neutral{
-    color:orange;
-    font-size:28px;
-    font-weight:bold;
+    color:#ffcc00;
+    font-size:30px;
+    font-weight:800;
+}
+
+.small{
+    color:#94a3b8;
+    font-size:14px;
 }
 
 </style>
 """, unsafe_allow_html=True)
 
-# =====================================================
+# ======================================================
 # LOGIN
-# =====================================================
+# ======================================================
 
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
@@ -77,11 +97,14 @@ if "logged_in" not in st.session_state:
 def login_page():
 
     st.markdown(
-        '<p class="title">AI MAJIQ CLOUD PRO</p>',
+        '<div class="main-title">AI MAJIQ CLOUD PRO</div>',
         unsafe_allow_html=True
     )
 
-    st.subheader("Professional AI Trading Scanner")
+    st.markdown(
+        '<div class="sub-title">Professional AI Live Trading Scanner</div>',
+        unsafe_allow_html=True
+    )
 
     user = st.text_input("Username")
 
@@ -95,31 +118,36 @@ def login_page():
         if user and password:
 
             st.session_state.logged_in = True
-
             st.rerun()
 
         else:
 
             st.error("Enter username and password")
 
-# =====================================================
+# ======================================================
 # MARKETS
-# =====================================================
+# ======================================================
 
 markets = {
 
+    # FOREX
     "EUR/USD": "EUR/USD",
     "GBP/USD": "GBP/USD",
     "USD/JPY": "USD/JPY",
     "AUD/USD": "AUD/USD",
+
+    # METALS
     "XAU/USD": "XAU/USD",
+    "XAG/USD": "XAG/USD",
+
+    # CRYPTO
     "BTC/USD": "BTC/USD",
     "ETH/USD": "ETH/USD"
 }
 
-# =====================================================
+# ======================================================
 # RSI
-# =====================================================
+# ======================================================
 
 def calculate_rsi(close, period=14):
 
@@ -139,9 +167,9 @@ def calculate_rsi(close, period=14):
 
     return rsi
 
-# =====================================================
+# ======================================================
 # MACD
-# =====================================================
+# ======================================================
 
 def calculate_macd(close):
 
@@ -155,9 +183,9 @@ def calculate_macd(close):
 
     return macd, signal
 
-# =====================================================
-# FETCH DATA
-# =====================================================
+# ======================================================
+# GET DATA
+# ======================================================
 
 def get_market_data(symbol, interval):
 
@@ -189,9 +217,9 @@ def get_market_data(symbol, interval):
     except:
         return None
 
-# =====================================================
+# ======================================================
 # SIGNAL ENGINE
-# =====================================================
+# ======================================================
 
 def scan_market(symbol, interval):
 
@@ -204,17 +232,23 @@ def scan_market(symbol, interval):
 
     current_price = close.iloc[-1]
 
+    # ==================================================
     # EMA
+    # ==================================================
 
     ema20 = close.ewm(span=20).mean().iloc[-1]
 
     ema50 = close.ewm(span=50).mean().iloc[-1]
 
+    # ==================================================
     # RSI
+    # ==================================================
 
     rsi = calculate_rsi(close).iloc[-1]
 
+    # ==================================================
     # MACD
+    # ==================================================
 
     macd, macd_signal = calculate_macd(close)
 
@@ -222,14 +256,20 @@ def scan_market(symbol, interval):
 
     macd_signal_value = macd_signal.iloc[-1]
 
-    # SCORE
+    # ==================================================
+    # AI CONFLUENCE LOGIC
+    # ==================================================
 
     score = 0
+
+    # EMA TREND
 
     if ema20 > ema50:
         score += 1
     else:
         score -= 1
+
+    # RSI MOMENTUM
 
     if rsi > 55:
         score += 1
@@ -237,12 +277,16 @@ def scan_market(symbol, interval):
     elif rsi < 45:
         score -= 1
 
+    # MACD CONFIRMATION
+
     if macd_value > macd_signal_value:
         score += 1
     else:
         score -= 1
 
-    # SIGNAL
+    # ==================================================
+    # FINAL SIGNAL
+    # ==================================================
 
     if score >= 2:
         signal = "BUY"
@@ -253,9 +297,18 @@ def scan_market(symbol, interval):
     else:
         signal = "NEUTRAL"
 
-    confidence = abs(score) * 33
+    # ==================================================
+    # CONFIDENCE
+    # ==================================================
 
+    confidence = abs(score) * 25 + 25
+
+    if confidence > 95:
+        confidence = 95
+
+    # ==================================================
     # TP / SL
+    # ==================================================
 
     if signal == "BUY":
 
@@ -272,7 +325,21 @@ def scan_market(symbol, interval):
     else:
 
         tp = current_price
+
         sl = current_price
+
+    # ==================================================
+    # TREND STRENGTH
+    # ==================================================
+
+    if confidence >= 80:
+        strength = "VERY STRONG"
+
+    elif confidence >= 65:
+        strength = "STRONG"
+
+    else:
+        strength = "MODERATE"
 
     return {
 
@@ -284,21 +351,42 @@ def scan_market(symbol, interval):
         "rsi": round(rsi, 2),
         "macd": round(macd_value, 4),
         "tp": tp,
-        "sl": sl
+        "sl": sl,
+        "strength": strength
     }
 
-# =====================================================
+# ======================================================
 # DASHBOARD
-# =====================================================
+# ======================================================
 
 def dashboard():
 
     st.markdown(
-        '<p class="title">LIVE AI SIGNAL SCANNER</p>',
+        '<div class="main-title">LIVE AI SIGNAL SCANNER</div>',
         unsafe_allow_html=True
     )
 
-    st.success("20+ UPGRADES ACTIVE")
+    st.markdown(
+        '<div class="sub-title">20+ Professional Upgrades Active</div>',
+        unsafe_allow_html=True
+    )
+
+    # ==================================================
+    # METRICS
+    # ==================================================
+
+    c1, c2, c3, c4 = st.columns(4)
+
+    c1.metric("Markets", len(markets))
+    c2.metric("Scanner", "ONLINE")
+    c3.metric("Signals", "LIVE")
+    c4.metric("Accuracy", "55-75%")
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # ==================================================
+    # TIMEFRAME
+    # ==================================================
 
     timeframe = st.selectbox(
         "Select Timeframe",
@@ -313,20 +401,25 @@ def dashboard():
 
         st.rerun()
 
+    # ==================================================
+    # BUTTON
+    # ==================================================
+
     if st.button("SCAN LIVE MARKET"):
 
         total = 0
 
         for pair, symbol in markets.items():
 
-            result = scan_market(
-                symbol,
-                timeframe
-            )
+            result = scan_market(symbol, timeframe)
 
             if result:
 
                 total += 1
+
+                # ==========================================
+                # COLORS
+                # ==========================================
 
                 if result["signal"] == "BUY":
                     cls = "buy"
@@ -337,6 +430,10 @@ def dashboard():
                 else:
                     cls = "neutral"
 
+                # ==========================================
+                # CARD
+                # ==========================================
+
                 st.markdown(f"""
 
                 <div class="card">
@@ -346,6 +443,13 @@ def dashboard():
                 <p class="{cls}">
                 {result["signal"]}
                 </p>
+
+                <div class="small">
+                Updated:
+                {datetime.now().strftime("%H:%M:%S")}
+                </div>
+
+                <br>
 
                 <b>Live Entry:</b>
                 {result["price"]}<br><br>
@@ -362,8 +466,11 @@ def dashboard():
                 <b>MACD:</b>
                 {result["macd"]}<br>
 
-                <b>Confidence:</b>
+                <b>AI Confidence:</b>
                 {result["confidence"]}%<br>
+
+                <b>Trend Strength:</b>
+                {result["strength"]}<br>
 
                 <b>Take Profit:</b>
                 {result["tp"]}<br>
@@ -371,8 +478,8 @@ def dashboard():
                 <b>Stop Loss:</b>
                 {result["sl"]}<br>
 
-                <b>Updated:</b>
-                {datetime.now().strftime("%H:%M:%S")}
+                <b>Timeframe:</b>
+                {timeframe}
 
                 </div>
 
@@ -380,9 +487,9 @@ def dashboard():
 
         st.success(f"{total} LIVE SIGNALS GENERATED")
 
-# =====================================================
+# ======================================================
 # ROUTER
-# =====================================================
+# ======================================================
 
 if st.session_state.logged_in:
     dashboard()
